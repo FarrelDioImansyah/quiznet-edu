@@ -11,7 +11,6 @@ function generateRoomCode() {
 
 module.exports = (io, socket, rooms) => {
 
-  // ── CREATE ROOM ────────────────────────────────────────────
   socket.on('create-room', async ({ username, quizId }) => {
     let roomCode;
     do { roomCode = generateRoomCode(); } while (rooms[roomCode]);
@@ -21,16 +20,16 @@ module.exports = (io, socket, rooms) => {
       hostName: username,
       quizId,
       status:   'waiting',
-      players:  {},
+      players:  {},       // hanya player, BUKAN host
       currentQ: 0,
       timer:    null,
+      questions: [],
       _hostDisconnectTimer: null
     };
 
-    rooms[roomCode].players[socket.id] = { username, score: 0, correct: 0, wrong: 0 };
-
     socket.join(roomCode);
     socket.roomCode = roomCode;
+    socket.isHost   = true;
 
     try {
       await db.execute(
@@ -42,10 +41,9 @@ module.exports = (io, socket, rooms) => {
     }
 
     socket.emit('room-created', { roomCode });
-    console.log(`[Room] ✅ Room ${roomCode} dibuat oleh ${username}`);
+    console.log(`[Room] ✅ Room ${roomCode} dibuat oleh HOST ${username}`);
   });
 
-  // ── JOIN ROOM ──────────────────────────────────────────────
   socket.on('join-room', ({ username, roomCode }) => {
     const room = rooms[roomCode];
 
@@ -56,6 +54,7 @@ module.exports = (io, socket, rooms) => {
     room.players[socket.id] = { username, score: 0, correct: 0, wrong: 0 };
     socket.join(roomCode);
     socket.roomCode = roomCode;
+    socket.isHost   = false;
 
     socket.emit('room-joined', { roomCode, isHost: false });
     io.to(roomCode).emit('player-list-update', {
@@ -65,7 +64,6 @@ module.exports = (io, socket, rooms) => {
     console.log(`[Room] 👤 ${username} join ${roomCode}`);
   });
 
-  // ── REJOIN ROOM (setelah pindah halaman) ───────────────────
   socket.on('rejoin-room', ({ username, roomCode, isHost }) => {
     const room = rooms[roomCode];
     if (!room) return socket.emit('error-message', { msg: 'Room sudah tidak ada.' });
@@ -73,12 +71,17 @@ module.exports = (io, socket, rooms) => {
     if (isHost && room._hostDisconnectTimer) {
       clearTimeout(room._hostDisconnectTimer);
       room._hostDisconnectTimer = null;
-      console.log(`[Room] ✅ Host reconnect, timer dibatalkan untuk ${roomCode}`);
     }
 
-    if (isHost) room.hostId = socket.id;
+    if (isHost) {
+      room.hostId   = socket.id;
+      socket.isHost = true;
+      // Host tidak masuk players
+    } else {
+      room.players[socket.id] = { username, score: 0, correct: 0, wrong: 0 };
+      socket.isHost = false;
+    }
 
-    room.players[socket.id] = { username, score: 0, correct: 0, wrong: 0 };
     socket.join(roomCode);
     socket.roomCode = roomCode;
 
@@ -90,12 +93,28 @@ module.exports = (io, socket, rooms) => {
     console.log(`[Room] 🔄 ${username} rejoin ${roomCode} (isHost: ${isHost})`);
   });
 
-  // ── DISCONNECT ─────────────────────────────────────────────
+  // Host upload pertanyaan via JSON
+  socket.on('import-questions', ({ roomCode, questions }) => {
+    const room = rooms[roomCode];
+    if (!room) return socket.emit('error-message', { msg: 'Room tidak ditemukan.' });
+    if (room.hostId !== socket.id) return socket.emit('error-message', { msg: 'Hanya host yang bisa import soal.' });
+
+    // Validasi format
+    const valid = questions.every(q =>
+      q.question_text && q.option_a && q.option_b &&
+      q.option_c && q.option_d && ['a','b','c','d'].includes(q.correct_answer)
+    );
+
+    if (!valid) return socket.emit('error-message', { msg: 'Format JSON tidak valid. Cek template.' });
+
+    room.questions = questions.map((q, i) => ({ ...q, id: i + 1, order_num: i + 1, time_limit: q.time_limit || 20 }));
+    socket.emit('questions-imported', { count: room.questions.length });
+    console.log(`[Room] 📋 ${room.questions.length} soal diimport ke room ${roomCode}`);
+  });
+
   socket.on('disconnect', () => {
     const code = socket.roomCode;
     if (!code || !rooms[code]) return;
-
-    delete rooms[code].players[socket.id];
 
     if (rooms[code].hostId === socket.id) {
       console.log(`[Room] ⏳ Host disconnect dari ${code}, menunggu 5 detik...`);
@@ -107,13 +126,13 @@ module.exports = (io, socket, rooms) => {
         console.log(`[Room] ❌ Room ${code} ditutup (host timeout)`);
       }, 5000);
     } else {
+      delete rooms[code].players[socket.id];
       io.to(code).emit('player-list-update', {
         players: Object.values(rooms[code].players)
       });
     }
   });
 
-  // ── CLOSE ROOM (manual) ────────────────────────────────────
   socket.on('close-room', () => {
     const code = socket.roomCode;
     if (!code || !rooms[code]) return;
