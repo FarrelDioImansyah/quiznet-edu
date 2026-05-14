@@ -85,7 +85,7 @@ module.exports = (io, socket, rooms) => {
     socket.join(roomCode);
     socket.roomCode = roomCode;
 
-    socket.emit('room-joined', { roomCode, isHost });
+    socket.emit('room-rejoined', { roomCode, isHost });
     io.to(roomCode).emit('player-list-update', {
       players: Object.values(room.players)
     });

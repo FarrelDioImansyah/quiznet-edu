@@ -26,6 +26,9 @@ socket.on('room-joined', ({ roomCode, isHost }) => {
   sessionStorage.setItem('quiznet_state', JSON.stringify(state));
   if (!isHost) window.location.href = '/quiz.html';
 });
+socket.on('room-rejoined', ({ roomCode, isHost }) => {
+  console.log(`Rejoined room ${roomCode}`);
+});
 
 socket.on('error-message', ({ msg }) => {
   if (typeof showError === 'function') showError(msg);
