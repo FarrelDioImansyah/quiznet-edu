@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QuizNet Edu — Quiz</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="quiz-layout">
+
+    <!-- Sidebar: Leaderboard + Voice -->
+    <aside class="sidebar">
+      <div class="room-info">
+        Room: <strong id="room-code-display">—</strong>
+      </div>
+      <div class="voice-controls">
+        <h4>🎙 Voice Chat</h4>
+        <button id="btn-mic" onclick="toggleMic()">Aktifkan Mikrofon</button>
+        <div id="peer-audio-list"></div>
+      </div>
+      <div class="leaderboard">
+        <h4>🏆 Leaderboard</h4>
+        <ol id="leaderboard-list"></ol>
+      </div>
+    </aside>
+
+    <!-- Main: Soal & Timer -->
+    <main class="quiz-main">
+
+      <!-- Waiting Room -->
+      <div id="waiting-screen" class="screen">
+        <h2>Menunggu Host memulai...</h2>
+        <p>Kode Room: <strong id="room-code-waiting">—</strong></p>
+        <div id="player-list-waiting"></div>
+        <!-- Hanya muncul untuk Host -->
+        <button id="btn-start" class="hidden" onclick="startQuiz()">🚀 Mulai Kuis</button>
+      </div>
+
+      <!-- Question Screen -->
+      <div id="question-screen" class="screen hidden">
+        <div class="timer-bar">
+          <div id="timer-fill"></div>
+        </div>
+        <div class="q-meta">
+          Soal <span id="q-index">1</span> / <span id="q-total">?</span>
+          &nbsp;|&nbsp; Sisa: <span id="timer-display">20</span>s
+        </div>
+        <div class="question-text" id="question-text">...</div>
+        <div class="options-grid">
+          <button class="opt" onclick="submitAnswer('a')" id="opt-a"></button>
+          <button class="opt" onclick="submitAnswer('b')" id="opt-b"></button>
+          <button class="opt" onclick="submitAnswer('c')" id="opt-c"></button>
+          <button class="opt" onclick="submitAnswer('d')" id="opt-d"></button>
+        </div>
+        <div id="answer-feedback" class="feedback hidden"></div>
+      </div>
+
+      <!-- Game Over Screen -->
+      <div id="gameover-screen" class="screen hidden">
+        <h2>🎉 Kuis Selesai!</h2>
+        <div id="final-leaderboard"></div>
+        <button onclick="sessionStorage.clear(); window.location.href='/'">Kembali ke Beranda</button>
+      </div>
+
+    </main>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="js/socket-client.js"></script>
+  <script src="js/webrtc-client.js"></script>
+  <script src="js/quiz-ui.js"></script>
+</body>
+</html>

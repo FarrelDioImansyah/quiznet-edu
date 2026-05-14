@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QuizNet Edu — Join Room</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="landing-container">
+    <div class="logo">⚡ QuizNet<span>Edu</span></div>
+    <p class="tagline">Real-time Quiz + Voice Chat Platform</p>
+
+    <div class="card" id="join-section">
+      <h2>Masuk ke Room</h2>
+      <input type="text" id="username" placeholder="Username kamu" maxlength="20">
+      <input type="text" id="room-code" placeholder="Room Code (contoh: EDU123)" maxlength="6" style="text-transform:uppercase">
+      <button id="btn-join" onclick="joinRoom()">Join Room</button>
+      <div class="divider">atau</div>
+      <button id="btn-host" class="secondary" onclick="showHostPanel()">Buat Room Baru</button>
+    </div>
+
+    <div class="card hidden" id="host-section">
+      <h2>Buat Room Baru</h2>
+      <input type="text" id="host-username" placeholder="Username kamu (Host)" maxlength="20">
+      <select id="quiz-select">
+        <option value="">-- Pilih Kuis --</option>
+      </select>
+      <button onclick="createRoom()">Buat Room</button>
+      <button class="secondary" onclick="showJoinPanel()">← Kembali</button>
+    </div>
+
+    <div id="error-msg" class="error hidden"></div>
+  </div>
+
+  <!-- Socket.IO dari server -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="js/socket-client.js"></script>
+  <script>
+    // Load daftar kuis dari API
+    fetch('/api/quizzes')
+      .then(r => r.json())
+      .then(data => {
+        if (!data.success) return;
+        const sel = document.getElementById('quiz-select');
+        data.data.forEach(q => {
+          const opt = document.createElement('option');
+          opt.value = q.id;
+          opt.textContent = q.title;
+          sel.appendChild(opt);
+        });
+      });
+
+    function showHostPanel() {
+      document.getElementById('join-section').classList.add('hidden');
+      document.getElementById('host-section').classList.remove('hidden');
+    }
+    function showJoinPanel() {
+      document.getElementById('host-section').classList.add('hidden');
+      document.getElementById('join-section').classList.remove('hidden');
+    }
+    function joinRoom() {
+      const username = document.getElementById('username').value.trim();
+      const roomCode = document.getElementById('room-code').value.trim().toUpperCase();
+      if (!username || !roomCode) return showError('Username dan Room Code wajib diisi!');
+      socket.emit('join-room', { username, roomCode });
+    }
+    function createRoom() {
+      const username = document.getElementById('host-username').value.trim();
+      const quizId   = document.getElementById('quiz-select').value;
+      if (!username) return showError('Username wajib diisi!');
+      socket.emit('create-room', { username, quizId: quizId || null });
+    }
+    function showError(msg) {
+      const el = document.getElementById('error-msg');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+      setTimeout(() => el.classList.add('hidden'), 3000);
+    }
+  </script>
+</body>
+</html>
