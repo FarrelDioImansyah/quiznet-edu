@@ -41,13 +41,21 @@ module.exports = (io, socket, rooms) => {
 
   // ── Notifikasi peer baru masuk room (trigger offer) ────────
   // Saat user baru join, beritahu semua peer lain untuk mulai signaling
-  socket.on('request-peers', () => {
+ socket.on('request-peers', () => {
+
     const code = socket.roomCode;
     const room = rooms[code];
+
     if (!room) return;
 
-    // Kirim daftar peer yang sudah ada ke user baru
-    const existingPeers = Object.keys(room.players).filter(id => id !== socket.id);
-    socket.emit('existing-peers', { peers: existingPeers });
+    const existingPeers = [
+      room.hostId,
+      ...Object.keys(room.players)
+    ].filter(id => id && id !== socket.id);
+
+    socket.emit('existing-peers', {
+      peers: existingPeers
+    });
+
   });
 };

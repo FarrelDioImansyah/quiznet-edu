@@ -60,6 +60,9 @@ module.exports = (io, socket, rooms) => {
     io.to(roomCode).emit('player-list-update', {
       players: Object.values(room.players)
     });
+    socket.to(roomCode).emit('peer-rejoin', {
+  peerId: socket.id
+});
 
     console.log(`[Room] 👤 ${username} join ${roomCode}`);
   });
@@ -90,6 +93,10 @@ module.exports = (io, socket, rooms) => {
       players: Object.values(room.players)
     });
 
+socket.to(roomCode).emit('peer-rejoin', {
+  peerId: socket.id
+});
+
     console.log(`[Room] 🔄 ${username} rejoin ${roomCode} (isHost: ${isHost})`);
   });
 
@@ -105,12 +112,37 @@ module.exports = (io, socket, rooms) => {
       q.option_c && q.option_d && ['a','b','c','d'].includes(q.correct_answer)
     );
 
+    if (questions.length < 5) {
+  return socket.emit('error-message', {
+    msg: 'Minimal 5 soal.'
+  });
+}
     if (!valid) return socket.emit('error-message', { msg: 'Format JSON tidak valid. Cek template.' });
 
     room.questions = questions.map((q, i) => ({ ...q, id: i + 1, order_num: i + 1, time_limit: q.time_limit || 20 }));
     socket.emit('questions-imported', { count: room.questions.length });
     console.log(`[Room] 📋 ${room.questions.length} soal diimport ke room ${roomCode}`);
   });
+
+socket.on('leave-room', () => {
+
+  const code = socket.roomCode;
+
+  if (!code || !rooms[code]) return;
+
+  // host tidak boleh pakai leave-room
+  if (rooms[code].hostId === socket.id) return;
+
+  delete rooms[code].players[socket.id];
+
+  socket.leave(code);
+
+  io.to(code).emit('player-list-update', {
+    players: Object.values(rooms[code].players)
+  });
+
+  console.log(`[Room] 🚪 Player keluar dari ${code}`);
+});
 
   socket.on('disconnect', () => {
     const code = socket.roomCode;

@@ -22,29 +22,45 @@ let micEnabled     = false;
 
 // ── STEP 1: Aktifkan Mikrofon ─────────────────────────────────
 async function toggleMic() {
+  // MUTE
   if (micEnabled) {
-    // Matikan mikrofon
-    if (localStream) localStream.getTracks().forEach(t => t.stop());
-    localStream = null;
-    micEnabled  = false;
+    localStream.getAudioTracks().forEach(track => {
+      track.enabled = false;
+    });
+
+    micEnabled = false;
     document.getElementById('btn-mic').textContent = 'Aktifkan Mikrofon';
-    console.log('[WebRTC] 🎙 Mikrofon dimatikan');
+    return;
+  }
+
+  // UNMUTE dari stream lama
+  if (localStream) {
+    localStream.getAudioTracks().forEach(track => {
+      track.enabled = true;
+    });
+
+    micEnabled = true;
+    document.getElementById('btn-mic').textContent = 'Matikan Mikrofon';
     return;
   }
 
   try {
-    // Minta izin akses mikrofon ke browser
-    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-    micEnabled  = true;
-    document.getElementById('btn-mic').textContent = '🔴 Matikan Mikrofon';
-    console.log('[WebRTC] 🎙 Mikrofon aktif');
 
-    // Minta daftar peer yang sudah ada di room
+    // pertama kali akses mic
+    localStream = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+      video: false
+    });
+
+    micEnabled = true;
+
+    document.getElementById('btn-mic').textContent =
+      'Matikan Mikrofon';
+
     socket.emit('request-peers');
 
   } catch (err) {
-    console.error('[WebRTC] ❌ Gagal akses mikrofon:', err);
-    alert('Tidak bisa akses mikrofon. Pastikan izin browser diberikan.');
+    console.error(err);
   }
 }
 
@@ -150,6 +166,47 @@ function addRemoteAudio(peerId, stream) {
 }
 
 function removeRemoteAudio(peerId) {
-  const el = document.getElementById(`audio-${peerId}`);
-  if (el) el.remove();
+
+  const audio = document.getElementById(`audio-${peerId}`);
+  if (audio) audio.remove();
+
+  // hapus label peer juga
+  document.querySelectorAll('.peer-label').forEach(el => {
+    if (el.textContent.includes(peerId.slice(0, 6))) {
+      el.remove();
+    }
+  });
+
+  // cleanup rtc
+  if (peerConnections[peerId]) {
+    peerConnections[peerId].close();
+    delete peerConnections[peerId];
+  }
 }
+socket.on('peer-left', ({ peerId }) => {
+  removeRemoteAudio(peerId);
+});
+socket.on('peer-rejoin', async ({ peerId }) => {
+
+  // hanya user yang mic nya aktif
+  if (!micEnabled || !localStream) return;
+
+  try {
+
+    // hapus koneksi lama
+    if (peerConnections[peerId]) {
+      peerConnections[peerId].close();
+      delete peerConnections[peerId];
+    }
+
+    // buat ulang offer
+    await createOffer(peerId);
+
+  } catch (err) {
+    console.error('[WebRTC] peer-rejoin error:', err);
+  }
+});
+
+socket.on('peer-left', ({ peerId }) => {
+  removeRemoteAudio(peerId);
+});

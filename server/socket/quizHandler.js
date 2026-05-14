@@ -63,6 +63,21 @@ module.exports = (io, socket, rooms) => {
     }
 
     broadcastLeaderboard(io, code, room);
+    const allAnswered = Object.values(room.players)
+  .every(p => p.answered);
+
+if (allAnswered) {
+  clearInterval(room.timer);
+
+  io.to(code).emit('question-ended', {
+    correctAnswer: question.correct_answer
+  });
+
+  setTimeout(() => {
+    room.currentQ++;
+    sendQuestion(io, code, room);
+  }, 1500);
+}
   });
 };
 

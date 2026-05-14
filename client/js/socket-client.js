@@ -85,3 +85,13 @@ function submitAnswer(answer) {
   socket.emit('submit-answer', { answer });
   document.querySelectorAll('.opt').forEach(b => b.disabled = true);
 }
+window.leaveRoom = function () {
+
+  if (!confirm('Keluar dari room?')) return;
+
+  socket.emit('leave-room');
+
+  sessionStorage.clear();
+
+  window.location.href = '/';
+};

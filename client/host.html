@@ -33,10 +33,66 @@
     .count-badge { background: #1f6feb33; border: 1px solid #1f6feb; color: #58a6ff; padding: 2px 8px; border-radius: 20px; font-size: 12px; margin-left: 8px; }
     h1.host-title { text-align: center; padding: 20px 24px 0; font-size: 20px; }
     h1.host-title span { color: #58a6ff; }
+    @media (max-width: 768px) {
+
+  .host-layout {
+    grid-template-columns: 1fr;
+    padding: 12px;
+  }
+
+  .host-card {
+    padding: 16px;
+  }
+
+  .room-code-big {
+    font-size: 32px;
+    letter-spacing: 4px;
+    word-break: break-word;
+  }
+
+  h1.host-title {
+    font-size: 18px;
+    padding: 16px 12px 0;
+  }
+
+  .player-item {
+    font-size: 13px;
+    flex-wrap: wrap;
+  }
+
+  .question-preview {
+    font-size: 12px;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+
+  .btn-start {
+    font-size: 16px;
+    padding: 14px;
+  }
+
+  input,
+  select,
+  button {
+    font-size: 16px;
+  }
+
+  .import-zone {
+    padding: 16px;
+  }
+
+  .import-zone .icon {
+    font-size: 24px;
+  }
+
+  #question-list {
+    max-height: 250px;
+  }
+}
   </style>
 </head>
 <body>
-  <h1 class="host-title">⚡ QuizNet<span>Edu</span> — Host Panel</h1>
+  <h1 class="host-title">QuizNet<span>Edu</span> — Host Panel</h1>
 
   <div class="host-layout">
 
@@ -69,10 +125,38 @@
         </div>
 
         <a href="#" class="template-link" onclick="downloadTemplate()">⬇ Download template JSON</a>
+	<hr style="margin:16px 0;border-color:#30363d">
 
+<h3>✍ Buat Soal Manual</h3>
+
+<input type="text" id="manual-question" placeholder="Pertanyaan">
+
+<input type="text" id="opt-a" placeholder="Opsi A">
+<input type="text" id="opt-b" placeholder="Opsi B">
+<input type="text" id="opt-c" placeholder="Opsi C">
+<input type="text" id="opt-d" placeholder="Opsi D">
+
+<select id="correct-answer">
+  <option value="a">Jawaban Benar: A</option>
+  <option value="b">Jawaban Benar: B</option>
+  <option value="c">Jawaban Benar: C</option>
+  <option value="d">Jawaban Benar: D</option>
+</select>
+
+<input type="number" id="time-limit" placeholder="Waktu (detik)" value="20">
+
+<button onclick="addManualQuestion()">
+  ➕ Tambah Soal
+</button>
         <div id="question-list" style="max-height:300px;overflow-y:auto;margin-top:12px"></div>
       </div>
+	<div style="margin-bottom:16px">
+  <button id="btn-mic" onclick="toggleMic()">
+    🎙 Aktifkan Mikrofon
+  </button>
 
+  <div id="peer-audio-list" style="margin-top:10px"></div>
+</div>
       <div class="host-card">
         <h3>🎮 Kontrol Kuis</h3>
         <div style="margin-bottom:12px;font-size:14px;color:#8b949e">
@@ -92,7 +176,7 @@
   <script>
     const socket = io();
     const state  = JSON.parse(sessionStorage.getItem('quiznet_state') || '{}');
-    let importedQuestions = [];
+    let questions = [];
 
     // Init
     window.addEventListener('DOMContentLoaded', () => {
@@ -147,7 +231,7 @@
         try {
           const data = JSON.parse(e.target.result);
           if (!Array.isArray(data)) return alert('File harus berupa array JSON!');
-          importedQuestions = data;
+          questions = data;
           renderQuestionPreview(data);
           socket.emit('import-questions', { roomCode: state.roomCode, questions: data });
         } catch (err) {
@@ -167,7 +251,63 @@
       const file = e.dataTransfer.files[0];
       if (file) { document.getElementById('file-input').files = e.dataTransfer.files; handleFileImport({ target: { files: e.dataTransfer.files } }); }
     });
+function addManualQuestion() {
 
+  const question_text =
+    document.getElementById('manual-question').value.trim();
+
+  const option_a =
+    document.getElementById('opt-a').value.trim();
+
+  const option_b =
+    document.getElementById('opt-b').value.trim();
+
+  const option_c =
+    document.getElementById('opt-c').value.trim();
+
+  const option_d =
+    document.getElementById('opt-d').value.trim();
+
+  const correct_answer =
+    document.getElementById('correct-answer').value;
+
+  const time_limit =
+    parseInt(document.getElementById('time-limit').value) || 20;
+
+  if (
+    !question_text ||
+    !option_a ||
+    !option_b ||
+    !option_c ||
+    !option_d
+  ) {
+    return alert('Semua field wajib diisi');
+  }
+
+  questions.push({
+    question_text,
+    option_a,
+    option_b,
+    option_c,
+    option_d,
+    correct_answer,
+    time_limit
+  });
+
+  renderQuestionPreview(questions);
+
+  document.getElementById('q-count').textContent =
+    `${questions.length} soal`;
+
+  checkStartReady();
+
+  // reset form
+  document.getElementById('manual-question').value = '';
+  document.getElementById('opt-a').value = '';
+  document.getElementById('opt-b').value = '';
+  document.getElementById('opt-c').value = '';
+  document.getElementById('opt-d').value = '';
+}
     function renderQuestionPreview(questions) {
       const el = document.getElementById('question-list');
       el.innerHTML = questions.map((q, i) =>
@@ -181,7 +321,7 @@
 
     function checkStartReady() {
       const playerCount = document.querySelectorAll('.player-item').length;
-      const hasQuestions = importedQuestions.length > 0;
+      const hasQuestions = questions.length > 5;
       const btn = document.getElementById('btn-start');
       const badge = document.getElementById('status-badge');
 
@@ -258,5 +398,8 @@
       document.getElementById('status-badge').textContent = 'Selesai';
     });
   </script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="js/webrtc-client.js"></script>y
 </body>
 </html>
+
